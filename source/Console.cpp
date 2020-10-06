@@ -109,7 +109,7 @@ namespace Console
 				default:
 				{
 					int j = console.getCursorPosition();
-					console.textBuf[j] = (c - 32) | (console.color << 12);
+					console.textBuf[j] = c + console.color;
 					console.updateCursor();
 					break;
 				}
@@ -212,7 +212,7 @@ namespace Console
 		void* pltt = nFS_LoadFileByID(2090 - 131);
 
 		// load resources
-		nFS_LoadFileByIDToDest(2089 - 131, bg0c);
+		nFS_LoadFileByIDToDest(2089 - 131, bg0c + 0x200);
 		GXS_LoadBGPltt(pltt, 0x1A0, 0x60);
 
 		// free palette
@@ -242,7 +242,7 @@ namespace Console
 		vramBackup = (u8*)NSMB_AllocFromGameHeap(0x1C00 + 0x2600 + 0x200);
 		MI_CpuCopy32((void*)0x6200400, vramBackup, 0x1C00);
 		MI_CpuCopy32((void*)0x6202000, vramBackup + 0x1C00, 0x2600);
-		MI_CpuCopy32((void*)0x5000400, vramBackup + 0x1C00 + 0x2600, 0x200);
+		MI_CpuCopy32((void*)0x50005A0, vramBackup + 0x1C00 + 0x2600, 0x200);
 	}
 
 	void restoreVram()
@@ -258,7 +258,7 @@ namespace Console
 
 		MI_CpuCopy32(vramBackup, (void*)0x6200400, 0x1C00);
 		MI_CpuCopy32(vramBackup + 0x1C00, (void*)0x6202000, 0x2600);
-		MI_CpuCopy32(vramBackup + 0x1C00 + 0x2600, (void*)0x5000400, 0x200);
+		MI_CpuCopy32(vramBackup + 0x1C00 + 0x2600, (void*)0x50005A0, 0x200);
 		NSMB_FreeToGameHeap(vramBackup);
 	}
 }
