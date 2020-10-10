@@ -10,6 +10,7 @@ namespace Console
 
 		const int maxW = 32;
 		const int maxH = 32;
+		const int charOfs = 32;
 
 		struct ConsoleContext {
 			u16 textBuf[maxW * maxH];
@@ -66,11 +67,11 @@ namespace Console
 
 		// private
 		void _vaprint(const char* fmt, va_list va) {
-			char dst[32 * 24];
+			u8 dst[32 * 24];
 
-			OS_VSPrintf(dst, fmt, va);
+			OS_VSPrintf(reinterpret_cast<char*>(dst), fmt, va);
 
-			int len = strlen(dst);
+			int len = strlen(reinterpret_cast<char*>(dst));
 
 			s8 x = console.col;
 
@@ -109,7 +110,7 @@ namespace Console
 				default:
 				{
 					int j = console.getCursorPosition();
-					console.textBuf[j] = c + console.color;
+					console.textBuf[j] = (c - charOfs) | (console.color << 12);
 					console.updateCursor();
 					break;
 				}
@@ -152,6 +153,18 @@ namespace Console
 		_vaprint(fmt, va);
 		va_end(va);
 	}
+	void printxyc(u8 x, u8 y, Color col, const char* fmt, ...) {
+		gotoxy(x, y);
+		Color old = console.color;
+		console.color = col;
+
+		va_list va;
+		va_start(va, fmt);
+		_vaprint(fmt, va);
+		va_end(va);
+
+		console.color = old;
+	}
 
 	void align(Alignment alignment) {
 		console.alignment = alignment;
@@ -168,17 +181,17 @@ namespace Console
 		console.color = color;
 	}
 	void setBackdropColor(GXRgb color) {
-		*(u16*)HW_DB_BG_PLTT = color;
+		*reinterpret_cast<u16*>(HW_DB_BG_PLTT) = color;
 	}
 
 	void clear(u16 c) {
-		MI_CpuFill16(console.textBuf, c, 32 * 24 * sizeof(u16));
+		MI_CpuFill16(console.textBuf, (c - charOfs), maxW * maxH * sizeof(u16));
 
 		gotoxy(0, 0);
 		align(ALIGN_LEFT);
 	}
 	void update() {
-		u16* bg0s = (u16*)G2S_GetBG0ScrPtr();
+		u16* bg0s = reinterpret_cast<u16*>(G2S_GetBG0ScrPtr());
 
 		for (int i = 0; i < 32 * 24; i++) {
 			bg0s[i] = console.textBuf[i];
@@ -191,6 +204,8 @@ namespace Console
 		G2S_SetBG0Control(GX_BG_SCRSIZE_TEXT_256x256, GX_BG_COLORMODE_16, GX_BG_SCRBASE_0x2000, GX_BG_CHARBASE_0x00000, GX_BG_EXTPLTT_01);
 		GXS_SetVisiblePlane(GX_PLANEMASK_BG0);
 
+		GX_SetBankForSubBG(GX_VRAM_SUB_BG_32_H);
+
 		u16* bg0c = (u16*)G2S_GetBG0CharPtr();
 
 		// clear bg0 char data
@@ -198,27 +213,23 @@ namespace Console
 
 #if CONSOLE_USE_BIN_GFX
 		// resources
-		void* gfx = (void*)0x2039218;
-		void* pltt = (void*)0x2039838;
+		void* gfx = reinterpret_cast<void*>(0x2039218);
+		void* pltt = reinterpret_cast<void*>(0x2039838);
 
 		// load resources
 		MI_UncompressLZ16(gfx, bg0c + 0x200);
 		GXS_LoadBGPltt(pltt, 0x1A0, 0x60);
 #else
-		int dma = FS_GetDefaultDMA();
-		FS_SetDefaultDMA(-1);
 
 		// resources
 		void* pltt = nFS_LoadFileByID(2090 - 131);
 
 		// load resources
-		nFS_LoadFileByIDToDest(2089 - 131, bg0c + 0x200);
-		GXS_LoadBGPltt(pltt, 0x1A0, 0x60);
+		nFS_LoadFileByIDToDest(2089 - 131, bg0c);
+		GXS_LoadBGPltt(pltt, 0x0, 0x200);
 
 		// free palette
 		NSMB_FreeToGameHeap(pltt);
-
-		FS_SetDefaultDMA(dma);
 #endif
 		// reset console params
 		console.row = 0;
@@ -239,10 +250,13 @@ namespace Console
 		bg0ctr = G2S_GetBG0Control(); //Saves the background control
 		visiblePlane = GXS_GetVisiblePlane(); //Saves the graphic visible plane settings
 
+		//0x20 = 1 tile
+		//0xA5C0 = full table
+
 		vramBackup = (u8*)NSMB_AllocFromGameHeap(0x1C00 + 0x2600 + 0x200);
-		MI_CpuCopy32((void*)0x6200400, vramBackup, 0x1C00);
-		MI_CpuCopy32((void*)0x6202000, vramBackup + 0x1C00, 0x2600);
-		MI_CpuCopy32((void*)0x50005A0, vramBackup + 0x1C00 + 0x2600, 0x200);
+		//MI_CpuCopy32(reinterpret_cast<void*>(0x6200400), vramBackup, 0x1C00);
+		MI_CpuCopy32(reinterpret_cast<void*>(0x6200000), vramBackup + 0x1C00, 0x2600);
+		MI_CpuCopy32(reinterpret_cast<void*>(0x5000400), vramBackup + 0x1C00 + 0x2600, 0x200);
 	}
 
 	void restoreVram()
@@ -256,9 +270,9 @@ namespace Console
 		);
 		GXS_SetVisiblePlane(visiblePlane);
 
-		MI_CpuCopy32(vramBackup, (void*)0x6200400, 0x1C00);
-		MI_CpuCopy32(vramBackup + 0x1C00, (void*)0x6202000, 0x2600);
-		MI_CpuCopy32(vramBackup + 0x1C00 + 0x2600, (void*)0x50005A0, 0x200);
+		//MI_CpuCopy32(vramBackup, reinterpret_cast<void*>(0x6200400), 0x1C00);
+		MI_CpuCopy32(vramBackup + 0x1C00, reinterpret_cast<void*>(0x6200000), 0x2600);
+		MI_CpuCopy32(vramBackup + 0x1C00 + 0x2600, reinterpret_cast<void*>(0x5000400), 0x200);
 		NSMB_FreeToGameHeap(vramBackup);
 	}
 }

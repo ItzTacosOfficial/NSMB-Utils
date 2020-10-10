@@ -25,7 +25,7 @@ static int& playerNumber = *(int*)0x02085A7C;
 static int selectedMenu[2] = { 0 };
 static int selectedCheat[2] = { 0 }; //selected cheat int for the menu
 static bool menuOpened[2] = { false }; //console activated bool
-static bool playingLevel = false;
+static bool disableMenu[2] = { false };
 
 static u32 AVtempAddress = 0x0000000;
 static int AVcurDigit = 6;
@@ -35,19 +35,21 @@ static u32 AVdigitOne = 1 << (AVcurDigit * 4);
 static u32 AVadrNoDgt = AVtempAddress & ~AVdigitMask;
 static u32 AVadrDgt = AVtempAddress & AVdigitMask;
 
-static u32 RVaddress = 0x02000000;
-static u32 RVreadMode = 0; // 0=8bit, 1=16bit; 2=32bit
+static u32 RVaddress = 0x00000000;
+static u32 RVreadMode = 0; // 0 = 8bit, 1 = 16bit, 2 = 32bit
 static u32 RVcurDigit = 0;
+static bool RVColor = false;
 
 typedef void(*TextUpdater)();
+typedef void(*GetControls)();
 
 enum class MenuType
 {
 	Main,
 	Cheats,
 	CheatsInfo,
-	Debugger,
-	DebuggerAddAddr,
+	AddrViewer,
+	AddrViewerAdd,
 	RamViewer
 };
 
@@ -79,8 +81,8 @@ static const char* cheatDescriptions[CHEAT_COUNT] = {
 	"Hold " KEY_SELECT " and " KEY_R " to make the\nplayer bigger, hold " KEY_SELECT " and " KEY_L " to make the player smaller\n(it changes the model dimension,\nnot the hitbox)",
 };
 
-static int addressCount = 0;
-static int addressValues[15];
+static int AVaddressCount = 0;
+static int AVaddressValues[14];
 
 static const char* switchGfx[2] = { SWITCHOFF, SWITCHON };
 
@@ -116,7 +118,9 @@ void RVReadWord(u32 address, u8 out[4])
 
 static void updateTextMain()
 {
-	Console::clear(0);
+	Console::clear();
+
+	Console::setTextColor(Console::COLOR_WHITE);
 
 	Console::printxy(0, 0, LONG_LINE);
 	Console::printxy(4, 1, "NSMB Utils - Main Menu");
@@ -133,12 +137,14 @@ static void updateTextMain()
 	u32 i = 4;
 	if (selectedMenu[playerNumber] >= 0 && selectedMenu[playerNumber] < 3)
 		i += selectedMenu[playerNumber];
-	Console::printxy(2, i, ">");
+	Console::printxy(2, i, CURSOR1);
 }
 
 static void updateTextCheats()
 {
-	Console::clear(0);
+	Console::clear();
+
+	Console::setTextColor(Console::COLOR_WHITE);
 
 	Console::printxy(0, 0, LONG_LINE);
 	Console::printxy(3, 1, "NSMB Utils - Cheats Menu");
@@ -163,7 +169,9 @@ static void updateTextCheats()
 
 static void updateTextCheatsInfo()
 {
-	Console::clear(0);
+	Console::clear();
+
+	Console::setTextColor(Console::COLOR_WHITE);
 
 	Console::printxy(0, 0, LONG_LINE);
 	Console::printxy(3, 1, "NSMB Utils - Cheat Menu");
@@ -183,44 +191,48 @@ static void updateTextCheatsInfo()
 	Console::printxy(0, 23, LONG_LINE);
 }
 
-static void updateTextDebugger()
+static void updateTextAddrViewer()
 {
-	Console::clear(0);
+	Console::clear();
+
+	Console::setTextColor(Console::COLOR_WHITE);
 
 	Console::printxy(0, 0, LONG_LINE);
-	Console::printxy(4, 1, "NSMB Utils - Debugger");
+	Console::printxy(2, 1, "NSMB Utils - Address Viewer");
 	Console::printxy(0, 2, LONG_LINE);
 
 	Console::printxy(0, 20, LONG_LINE);
 	Console::printxy(0, 23, LONG_LINE);
 
-	if (!playingLevel)
-	{
-		Console::printxy(7, 21, KEY_SELECT " to go back");
-		Console::printxy(0, 22, KEY_Y " to add an address to the menu");
-	}
-	else
+	if (disableMenu[playerNumber])
 	{
 		Console::printxy(1, 21, "All the controls are disabled");
 		Console::printxy(4, 22, "because you are playing");
 	}
-
-	if (addressCount != 0)
+	else
 	{
-		for (int i = 0; i < addressCount; i++)
+		Console::printxy(0, 21, KEY_Y " & " KEY_X " to add & remove an address");
+		Console::printxy(7, 22, KEY_SELECT " to go back");
+	}
+
+	if (AVaddressCount != 0)
+	{
+		for (int i = 0; i < AVaddressCount; i++)
 		{
-			int val = *reinterpret_cast<int*>(addressValues[i]);
-			Console::printxy(4, 4 + i, "0x%08x = %08x", addressValues[i], val);
+			int val = *reinterpret_cast<int*>(AVaddressValues[i]);
+			Console::printxy(4, 4 + i, "0x%08x = %08x", AVaddressValues[i], val);
 		}
 	}
 }
 
-static void updateTextAddAddr()
+static void updateTextAddrViewerAdd()
 {
-	Console::clear(0);
+	Console::clear();
+
+	Console::setTextColor(Console::COLOR_WHITE);
 
 	Console::printxy(0, 0, LONG_LINE);
-	Console::printxy(4, 1, "NSMB Utils - Debugger");
+	Console::printxy(2, 1, "NSMB Utils - Address Viewer");
 	Console::printxy(0, 2, LONG_LINE);
 
 	Console::printxy(0, 19, LONG_LINE);
@@ -237,22 +249,35 @@ static void updateTextAddAddr()
 
 static void updateTextRamViewer()
 {
-	Console::clear(0);
+	Console::clear();
+
+	Console::setTextColor(Console::COLOR_WHITE);
 
 	Console::printxy(0, 0, LONG_LINE);
 	Console::printxy(4, 1, "NSMB Utils - Ram Viewer");
 	Console::printxy(0, 2, LONG_LINE);
 
-	Console::printxy(0, 19, LONG_LINE);
-	Console::printxy(1, 20, KEY_L " & " KEY_R " to scroll between digits");
-	Console::printxy(1, 21, KEY_X " & " KEY_Y " to change value & bitmode");
-	Console::printxy(8, 22, KEY_SELECT " to go back");
-	Console::printxy(0, 23, LONG_LINE);
+	if (disableMenu[playerNumber])
+	{
+		Console::printxy(0, 20, LONG_LINE);
+		Console::printxy(1, 21, "All the controls are disabled");
+		Console::printxy(4, 22, "because you are playing");
+		Console::printxy(0, 23, LONG_LINE);
+	}
+	else
+	{
+		Console::printxy(0, 19, LONG_LINE);
+		Console::printxy(1, 20, KEY_L " & " KEY_R " to scroll between digits");
+		Console::printxy(1, 21, KEY_X " & " KEY_Y " to change value & bitmode");
+		Console::printxy(8, 22, KEY_SELECT " to go back");
+		Console::printxy(0, 23, LONG_LINE);
+	}
 
 	Console::printxy(3, 4, "%2d-bit", 8 << RVreadMode);
 
 	Console::printxy(17, 4, "0x%08x", RVaddress);
-	Console::printxy(17 + 9 - RVcurDigit, 5, CURSOR2);
+	if (!disableMenu[playerNumber])
+		Console::printxy(17 + 9 - RVcurDigit, 5, CURSOR2);
 
 	Console::align(Console::ALIGN_LEFT);
 	for (int y = 0; y < 12; y++)
@@ -262,8 +287,6 @@ static void updateTextRamViewer()
 
 		for (int x = 0; x < 8; x += 4)
 		{
-			Console::setTextColor(x & 1 ? Console::COLOR_RED : Console::COLOR_WHITE);
-
 			u8 bytes[4];
 
 			switch (RVreadMode)
@@ -281,6 +304,13 @@ static void updateTextRamViewer()
 
 			for (int i = 0; i < 4; i++)
 			{
+				if (RVColor == false)
+					Console::setTextColor(Console::COLOR_WHITE);
+				else
+					Console::setTextColor(Console::COLOR_LIGHT_BLUE);
+
+				RVColor = !RVColor;
+
 				Console::printxy(2 + 12 + x * 8 + i * 2, 6 + y, "%02X", bytes[i]);
 			}
 		}
@@ -291,16 +321,184 @@ TextUpdater updaterForMenu[6] = {
 	updateTextMain,
 	updateTextCheats,
 	updateTextCheatsInfo,
-	updateTextDebugger,
-	updateTextAddAddr,
+	updateTextAddrViewer,
+	updateTextAddrViewerAdd,
 	updateTextRamViewer
+};
+
+static void controlsMain()
+{
+	int buttonsPressed_ = buttonsPressedAddr[playerNumber * 2];
+
+	RVcurDigit = 0;
+	AVcurDigit = 6;
+
+	if (buttonsPressed_ & PAD_BUTTON_R)
+	{
+		if (selectedMenu[playerNumber] != 2)
+			selectedMenu[playerNumber]++;
+	}
+
+	else if (buttonsPressed_ & PAD_BUTTON_L)
+	{
+		if (selectedMenu[playerNumber] != 0)
+			selectedMenu[playerNumber]--;
+	}
+
+	if (buttonsPressed_ & PAD_BUTTON_X)
+		switch (selectedMenu[playerNumber])
+		{
+		case 0:
+			menuType[playerNumber] = MenuType::Cheats;
+			break;
+		case 1:
+			menuType[playerNumber] = MenuType::AddrViewer;
+			break;
+		case 2:
+			menuType[playerNumber] = MenuType::RamViewer;
+			break;
+		}
+}
+
+static void controlsCheats()
+{
+	int buttonsPressed_ = buttonsPressedAddr[playerNumber * 2];
+
+	if (buttonsPressed_ & PAD_BUTTON_R)
+	{
+		if (selectedCheat[playerNumber] != CHEAT_COUNT - 1)
+			selectedCheat[playerNumber]++;
+	}
+
+	else if (buttonsPressed_ & PAD_BUTTON_L)
+	{
+		if (selectedCheat[playerNumber] != 0)
+			selectedCheat[playerNumber]--;
+	}
+
+	if (buttonsPressed_ & PAD_BUTTON_X)
+		cheatsEnabled[playerNumber][selectedCheat[playerNumber]] ^= 1;
+
+	else if (buttonsPressed_ & PAD_BUTTON_Y)
+		menuType[playerNumber] = MenuType::CheatsInfo;
+
+	else if (buttonsPressed_ & PAD_BUTTON_SELECT)
+		menuType[playerNumber] = MenuType::Main;
+}
+
+static void controlsCheatsInfo()
+{
+	int buttonsPressed_ = buttonsPressedAddr[playerNumber * 2];
+
+	if (buttonsPressed_ & PAD_BUTTON_Y)
+		menuType[playerNumber] = MenuType::Cheats;
+}
+
+static void controlsAddrViewer()
+{
+	int buttonsPressed_ = buttonsPressedAddr[playerNumber * 2];
+
+	if (buttonsPressed_ & PAD_BUTTON_SELECT)
+		menuType[playerNumber] = MenuType::Main;
+
+	if (buttonsPressed_ & PAD_BUTTON_Y)
+		menuType[playerNumber] = MenuType::AddrViewerAdd;
+
+	if (buttonsPressed_ & PAD_BUTTON_X)
+		AVaddressCount--;
+}
+
+static void controlsAddrViewerAdd()
+{
+	int buttonsPressed_ = buttonsPressedAddr[playerNumber * 2];
+
+	AVdigitMask = 0xF << (AVcurDigit * 4);
+	AVdigitOne = 1 << (AVcurDigit * 4);
+	AVadrNoDgt = AVtempAddress & ~AVdigitMask;
+	AVadrDgt = AVtempAddress & AVdigitMask;
+
+	if (PAD_BUTTON_R & buttonsPressed_)
+		AVcurDigit--;
+	else if (PAD_BUTTON_L & buttonsPressed_)
+		AVcurDigit++;
+
+	if (AVcurDigit == 7)
+		AVcurDigit = 6;
+
+	if (AVcurDigit < 0)
+		AVcurDigit = 0;
+
+	if (PAD_BUTTON_X & buttonsPressed_)
+	{
+		AVadrDgt = (AVadrDgt + AVdigitOne) & AVdigitMask;
+		AVtempAddress = AVadrNoDgt | AVadrDgt;
+	}
+	else if (PAD_BUTTON_Y & buttonsPressed_)
+	{
+		AVadrDgt = (AVadrDgt - AVdigitOne) & AVdigitMask;
+		AVtempAddress = AVadrNoDgt | AVadrDgt;
+	}
+
+	if (PAD_BUTTON_SELECT & buttonsPressed_)
+	{
+		AVaddressValues[AVcurAddress] = AVtempAddress;
+		if (++AVcurAddress > 15)
+			AVcurAddress = 0;
+		if (++AVaddressCount > 15)
+			AVaddressCount = 14;
+
+		AVtempAddress = 0x0000000;
+		AVcurDigit = 6;
+
+		menuType[playerNumber] = MenuType::AddrViewer;
+	}
+}
+
+static void controlsRamViewer()
+{
+	int buttonsPressed_ = buttonsPressedAddr[playerNumber * 2];
+
+	u32 digitMask = 0xF << (RVcurDigit * 4);
+
+	if (PAD_BUTTON_X & buttonsPressed_)
+		RVaddress = (RVaddress & ~digitMask) | (((RVaddress & digitMask) + (1 << (RVcurDigit * 4))) & digitMask);
+
+	if (PAD_BUTTON_Y & buttonsPressed_)
+		RVreadMode++;
+
+	if (buttonsPressed_ & PAD_BUTTON_L)
+	{
+		if (RVcurDigit != 6)
+			RVcurDigit++;
+	}
+
+	if (buttonsPressed_ & PAD_BUTTON_R)
+	{
+		if (RVcurDigit != 0)
+			RVcurDigit--;
+	}
+
+	if (buttonsPressed_ & PAD_BUTTON_SELECT)
+		menuType[playerNumber] = MenuType::Main;
+
+	if (RVreadMode >= 3)
+		RVreadMode = 0;
+}
+
+GetControls controlsForMenu[6] = {
+	controlsMain,
+	controlsCheats,
+	controlsCheatsInfo,
+	controlsAddrViewer,
+	controlsAddrViewerAdd,
+	controlsRamViewer
 };
 
 static void UpdateCheatMenuForPlayer(int playerNo)
 {
-	int buttonsPressed_ = buttonsPressedAddr[playerNo * 2];
+	int buttonsPressed_ = buttonsPressedAddr[playerNumber * 2];
 
-	if (!menuOpened[playerNo])
+	if (!menuOpened[playerNo] && !disableMenu[playerNo])
 	{
 		if (buttonsPressed_ & PAD_BUTTON_SELECT)
 		{
@@ -312,164 +510,12 @@ static void UpdateCheatMenuForPlayer(int playerNo)
 			menuOpened[playerNo] = true;
 		}
 	}
-	else
+	else if (playerNo == playerNumber)
 	{
-		if (playerNo == playerNumber)
-		{
-			updaterForMenu[(int)menuType[playerNo]]();
-			Console::update();
-		}
-
-		if (!playingLevel)
-		{
-			switch (menuType[playerNo])
-			{
-			case MenuType::Main:
-			{
-				RVcurDigit = 0;
-				AVcurDigit = 6;
-
-				if (buttonsPressed_ & PAD_BUTTON_R)
-				{
-					if (selectedMenu[playerNo] != 3)
-						selectedMenu[playerNo]++;
-				}
-
-				else if (buttonsPressed_ & PAD_BUTTON_L)
-				{
-					if (selectedMenu[playerNo] != 0)
-						selectedMenu[playerNo]--;
-				}
-
-				if (buttonsPressed_ & PAD_BUTTON_X)
-					switch (selectedMenu[playerNo])
-					{
-					case 0:
-						menuType[playerNo] = MenuType::Cheats;
-						break;
-					case 1:
-						menuType[playerNo] = MenuType::Debugger;
-						break;
-					case 2:
-						menuType[playerNo] = MenuType::RamViewer;
-						break;
-					}
-			}
-			break;
-			case MenuType::Cheats:
-			{
-				if (buttonsPressed_ & PAD_BUTTON_R)
-				{
-					if (selectedCheat[playerNo] != CHEAT_COUNT - 1)
-						selectedCheat[playerNo]++;
-				}
-
-				else if (buttonsPressed_ & PAD_BUTTON_L)
-				{
-					if (selectedCheat[playerNo] != 0)
-						selectedCheat[playerNo]--;
-				}
-
-				if (buttonsPressed_ & PAD_BUTTON_X)
-					cheatsEnabled[playerNo][selectedCheat[playerNo]] ^= 1;
-
-				else if (buttonsPressed_ & PAD_BUTTON_Y)
-					menuType[playerNo] = MenuType::CheatsInfo;
-
-				else if (buttonsPressed_ & PAD_BUTTON_SELECT)
-					menuType[playerNo] = MenuType::Main;
-			}
-			break;
-			case MenuType::CheatsInfo:
-			{
-				if (buttonsPressed_ & PAD_BUTTON_Y)
-					menuType[playerNo] = MenuType::Cheats;
-			}
-			break;
-			case MenuType::Debugger:
-			{
-				if (buttonsPressed_ & PAD_BUTTON_SELECT)
-					menuType[playerNo] = MenuType::Main;
-
-				if (buttonsPressed_ & PAD_BUTTON_Y)
-					menuType[playerNo] = MenuType::DebuggerAddAddr;
-			}
-			break;
-			case MenuType::DebuggerAddAddr:
-			{
-				AVdigitMask = 0xF << (AVcurDigit * 4);
-				AVdigitOne = 1 << (AVcurDigit * 4);
-				AVadrNoDgt = AVtempAddress & ~AVdigitMask;
-				AVadrDgt = AVtempAddress & AVdigitMask;
-
-				if (PAD_BUTTON_R & buttonsPressed_)
-					AVcurDigit--;
-				else if (PAD_BUTTON_L & buttonsPressed_)
-					AVcurDigit++;
-
-				if (AVcurDigit == 7)
-					AVcurDigit = 6;
-
-				if (AVcurDigit < 0)
-					AVcurDigit = 0;
-
-				if (PAD_BUTTON_X & buttonsPressed_)
-				{
-					AVadrDgt = (AVadrDgt + AVdigitOne) & AVdigitMask;
-					AVtempAddress = AVadrNoDgt | AVadrDgt;
-				}
-				else if (PAD_BUTTON_Y & buttonsPressed_)
-				{
-					AVadrDgt = (AVadrDgt - AVdigitOne) & AVdigitMask;
-					AVtempAddress = AVadrNoDgt | AVadrDgt;
-				}
-
-				if (PAD_BUTTON_SELECT & buttonsPressed_)
-				{
-					addressValues[AVcurAddress] = AVtempAddress;
-					if (++AVcurAddress > 15)
-						AVcurAddress = 0;
-					if (++addressCount > 15)
-						addressCount = 14;
-
-					AVtempAddress = 0x0000000;
-					AVcurDigit = 6;
-
-					menuType[playerNo] = MenuType::Debugger;
-				}
-			}
-			case MenuType::RamViewer:
-			{
-				u32 digitMask = 0xF << (RVcurDigit * 4);
-
-				if (PAD_BUTTON_X & buttonsPressed_)
-					RVaddress = (RVaddress & ~digitMask) | (((RVaddress & digitMask) + (1 << (RVcurDigit * 4))) & digitMask);
-
-				if (PAD_BUTTON_Y & buttonsPressed_)
-					RVreadMode++;
-
-				if (buttonsPressed_ & PAD_BUTTON_L)
-				{
-					if (RVcurDigit != 6)
-						RVcurDigit++;
-				}
-
-				if (buttonsPressed_ & PAD_BUTTON_R)
-				{
-					if (RVcurDigit != 0)
-						RVcurDigit--;
-				}
-
-				if (buttonsPressed_ & PAD_BUTTON_SELECT)
-					menuType[playerNo] = MenuType::Main;
-
-				if (RVreadMode >= 3)
-					RVreadMode = 0;
-			}
-			default:
-				break;
-			}
-		}
+		if (!disableMenu[playerNo])
+			controlsForMenu[(int)menuType[playerNo]]();
+		updaterForMenu[(int)menuType[playerNo]]();
+		Console::update();
 	}
 }
 
@@ -482,7 +528,7 @@ void hook_020a2c80_ov_00(void* stageScene)
 // PauseMenu::onOpen hook
 int repl_020A2900_ov_00()
 {
-	playingLevel = false;
+	disableMenu[playerNumber] = false;
 	return 0x020CA850; //Keep replaced instruction
 }
 
@@ -498,16 +544,24 @@ static void restoreAndClose()
 
 void hook_020A2518_ov_00() //pause menu close
 {
-	if ((menuType[playerNumber] == MenuType::Debugger) || (menuType[playerNumber] == MenuType::RamViewer))
+	if ((menuType[playerNumber] == MenuType::AddrViewer) || (menuType[playerNumber] == MenuType::RamViewer))
 	{
-		playingLevel = true;
+		disableMenu[playerNumber] = false;
 	}
 	else
+	{
+		disableMenu[playerNumber] = true;
 		restoreAndClose();
+	}
 }
 
 void hook_020A189C_ov_00() //level exit
 {
-	playingLevel = false;
+	disableMenu[playerNumber] = false;
 	restoreAndClose();
+}
+
+void hook_020baab8_ov_00() //playing level
+{
+	disableMenu[playerNumber] = true;
 }

@@ -38,12 +38,13 @@ namespace Console {
 
 	void print(const char* fmt, ...);
 	void printxy(u8 x, u8 y, const char* fmt, ...);
+	void printxyc(u8 x, u8 y, Color col, const char* fmt, ...);
 
 	void align(Alignment alignment);
 	void setTextColor(Color color);
 	void setBackdropColor(GXRgb color);
 
-	void clear(u16 c);
+	void clear(u16 c = ' ');
 	void update();
 	void init();
 
