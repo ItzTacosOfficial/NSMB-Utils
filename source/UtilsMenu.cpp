@@ -27,7 +27,7 @@ static int selectedCheat[2] = { 0 }; //selected cheat int for the menu
 static bool menuOpened[2] = { false }; //console activated bool
 static bool disableMenu[2] = { false };
 
-static u32 AVtempAddress = 0x0000000;
+static u32 AVtempAddress = 0x02000000;
 static int AVcurDigit = 6;
 static int AVcurAddress = 0;
 static u32 AVdigitMask = 0xF << (AVcurDigit * 4);
@@ -35,10 +35,11 @@ static u32 AVdigitOne = 1 << (AVcurDigit * 4);
 static u32 AVadrNoDgt = AVtempAddress & ~AVdigitMask;
 static u32 AVadrDgt = AVtempAddress & AVdigitMask;
 
-static u32 RVaddress = 0x00000000;
+static u32 RVaddress = 0x02000000;
 static u32 RVreadMode = 0; // 0 = 8bit, 1 = 16bit, 2 = 32bit
 static u32 RVcurDigit = 0;
-static bool RVColor = false;
+static bool RVcolor = false;
+static bool RVinvalid = false;
 
 typedef void(*TextUpdater)();
 typedef void(*GetControls)();
@@ -280,38 +281,54 @@ static void updateTextRamViewer()
 		Console::printxy(17 + 9 - RVcurDigit, 5, CURSOR2);
 
 	Console::align(Console::ALIGN_LEFT);
-	for (int y = 0; y < 12; y++)
+
+	if ((0x03810000 < RVaddress) || (RVaddress < 0x01ff8000))
 	{
-		Console::setTextColor(Console::COLOR_WHITE);
-		Console::printxy(2, 6 + y, "%08X ", RVaddress + y * 8);
-
-		for (int x = 0; x < 8; x += 4)
+		if (RVinvalid == false)
 		{
-			u8 bytes[4];
+			Vec3 i = (0, 0, 0);
+			PlaySNDEffect(238, &i);
+		}
 
-			switch (RVreadMode)
+		RVinvalid = true;
+
+		Console::printxy(7, 6, "Invalid Address");
+	}
+	else
+	{
+		for (int y = 0; y < 12; y++)
+		{
+			Console::setTextColor(Console::COLOR_WHITE);
+			Console::printxy(2, 6 + y, "%08X ", RVaddress + y * 8);
+
+			for (int x = 0; x < 8; x += 4)
 			{
-			case 0:
-				RVReadBytes(RVaddress + y * 8 + x * 4, bytes);
-				break;
-			case 1:
-				RVReadShorts(RVaddress + y * 8 + x * 4, bytes);
-				break;
-			case 2:
-				RVReadWord(RVaddress + y * 8 + x * 4, bytes);
-				break;
-			}
+				u8 bytes[4];
 
-			for (int i = 0; i < 4; i++)
-			{
-				if (RVColor == false)
-					Console::setTextColor(Console::COLOR_WHITE);
-				else
-					Console::setTextColor(Console::COLOR_LIGHT_BLUE);
+				switch (RVreadMode)
+				{
+				case 0:
+					RVReadBytes(RVaddress + y * 8 + x * 4, bytes);
+					break;
+				case 1:
+					RVReadShorts(RVaddress + y * 8 + x * 4, bytes);
+					break;
+				case 2:
+					RVReadWord(RVaddress + y * 8 + x * 4, bytes);
+					break;
+				}
 
-				RVColor = !RVColor;
+				for (int i = 0; i < 4; i++)
+				{
+					if (RVcolor == false)
+						Console::setTextColor(Console::COLOR_WHITE);
+					else
+						Console::setTextColor(Console::COLOR_LIGHT_BLUE);
 
-				Console::printxy(2 + 12 + x * 8 + i * 2, 6 + y, "%02X", bytes[i]);
+					RVcolor = !RVcolor;
+
+					Console::printxy(2 + 12 + x * 8 + i * 2, 6 + y, "%02X", bytes[i]);
+				}
 			}
 		}
 	}
@@ -405,7 +422,10 @@ static void controlsAddrViewer()
 		menuType[playerNumber] = MenuType::AddrViewerAdd;
 
 	if (buttonsPressed_ & PAD_BUTTON_X)
+	{
 		AVaddressCount--;
+		AVcurAddress--;
+	}
 }
 
 static void controlsAddrViewerAdd()
@@ -441,17 +461,27 @@ static void controlsAddrViewerAdd()
 
 	if (PAD_BUTTON_SELECT & buttonsPressed_)
 	{
-		AVaddressValues[AVcurAddress] = AVtempAddress;
-		if (++AVcurAddress > 15)
-			AVcurAddress = 0;
-		if (++AVaddressCount > 15)
-			AVaddressCount = 14;
+		if ((0x03810000 < AVtempAddress) || (AVtempAddress < 0x01ff8000))
+		{
+			Vec3 i = (0, 0, 0);
+			PlaySNDEffect(238, &i);
+		}
+		else
+		{
+			AVaddressValues[AVcurAddress] = AVtempAddress;
+			if (++AVcurAddress > 15)
+				AVcurAddress = 0;
+			if (++AVaddressCount > 15)
+				AVaddressCount = 14;
 
-		AVtempAddress = 0x0000000;
-		AVcurDigit = 6;
+			AVtempAddress = 0x02000000;
+			AVcurDigit = 6;
 
-		menuType[playerNumber] = MenuType::AddrViewer;
+			menuType[playerNumber] = MenuType::AddrViewer;
+		}
 	}
+
+	//238
 }
 
 static void controlsRamViewer()
