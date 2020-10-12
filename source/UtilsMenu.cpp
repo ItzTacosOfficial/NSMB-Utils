@@ -246,6 +246,8 @@ static void updateTextAddrViewerAdd()
 
 	Console::printxy(1, 6, "0x%08x", AVtempAddress);
 	Console::printxy(1 + 9 - AVcurDigit, 7, CURSOR2);
+
+	Console::printxy(1, 9, "Range: 0x03810000 - 0x01ff8000");
 }
 
 static void updateTextRamViewer()
@@ -286,8 +288,7 @@ static void updateTextRamViewer()
 	{
 		if (RVinvalid == false)
 		{
-			Vec3 i = (0, 0, 0);
-			PlaySNDEffect(238, &i);
+			PlaySNDEffect(238, nullptr);
 		}
 
 		RVinvalid = true;
@@ -462,10 +463,7 @@ static void controlsAddrViewerAdd()
 	if (PAD_BUTTON_SELECT & buttonsPressed_)
 	{
 		if ((0x03810000 < AVtempAddress) || (AVtempAddress < 0x01ff8000))
-		{
-			Vec3 i = (0, 0, 0);
-			PlaySNDEffect(238, &i);
-		}
+			PlaySNDEffect(238, nullptr);
 		else
 		{
 			AVaddressValues[AVcurAddress] = AVtempAddress;
