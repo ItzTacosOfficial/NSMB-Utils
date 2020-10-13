@@ -1,22 +1,27 @@
 #ifndef _CHEATS_H
 #define _CHEATS_H
 
-#define CHEAT_COUNT 10
-
-enum CHEAT_TYPE
+enum class CheatType
 {
-	FLY,
-	ANIM_RAND,
-	POWERUP_CYCLE,
-	SLOW_FALL,
-	STARMAN_SWITCH,
-	KILL_SWITCH,
-	FIREBALL_ABUSE,
-	FAST_MOVE,
-	WALL_CLIP,
-	SIZE_CHANGER,
+	Fly,
+	AnimRand,
+	PowerupCycle,
+	SlowFall,
+	StarmanSwitch,
+	KillSwitch,
+	FireballAbuse, //Overblade fucking god please finish fireflower
+	FastMove,
+	WallClip,
+	SizeChanger,
 };
 
-extern bool cheatsEnabled[2][CHEAT_COUNT];
+constexpr int cheatsCount = 10;
+
+extern bool cheatsEnabled[2][cheatsCount];
+
+inline bool isCheatEnabled(CheatType type, int playerNo)
+{
+    return cheatsEnabled[playerNo][static_cast<u32>(type)];
+}
 
 #endif //_CHEATS_H
