@@ -178,8 +178,8 @@ static void updateTextMain()
 	Console::printxy(0, 23, LONG_LINE);
 
 	Console::printxy(4, 4, "Cheats Menu");
-	Console::printxy(4, 5, "Debugger Menu");
-	Console::printxy(4, 6, "RamViewer Menu");
+	Console::printxy(4, 5, "Address Viewer Menu");
+	Console::printxy(4, 6, "Ram Viewer Menu");
 
 	u32 i = 4;
 	if (menuProps[playerNumber].selectedMenu >= 0 && menuProps[playerNumber].selectedMenu < 3)
