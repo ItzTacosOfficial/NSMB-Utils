@@ -30,6 +30,6 @@ This project wasn't possible without the help of:
 
 [Ed-1T](https://github.com/Ed-1T) for general help and for the original NSMB Console code;
 
-[TheGameratorT](https://github.com/TheGameratorT) for general help and for fixing crappy multiplayer bugs;
+[TheGameratorT](https://github.com/TheGameratorT) for general help, for most of the Cheats and for fixing crappy multiplayer bugs;
 
-[Overblade](https://github.com/Overblade) for helping me cleaning the code and for general help as well;
+[Overblade](https://github.com/Overblade) for helping me cleaning the code, for testing it in the first period and for general help as well;
