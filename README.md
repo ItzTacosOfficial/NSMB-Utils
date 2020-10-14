@@ -3,7 +3,7 @@ NSMB Utils it's an ASM hack for NSMB that includes a Cheat Menu, an Address View
 For now this menu can be only used in the level scene.
 ## How to open it
 To open the menu just press [start] while in a level to open the pause menu, and then press [select] to initialize the NSMB Utils's menu.
-The specific controls for the menu are showed in the bottom part of the bottom screen.
+The specific controls for the menu are shown in the bottom part of the bottom screen.
 The Utils menu will close every time you resume the level, except when you are using the Address Viewer or the Ram Viewer.
 Unfortunatly the options in the pause menu are disabled to avoid some graphical glitches.
 ## The cheat menu
