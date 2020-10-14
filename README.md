@@ -26,7 +26,10 @@ The addresses must be in a range of 0x03810000 - 0x01ff8000
 As the name says, here you can see ram values in 8-bit, 16-bit and 32-bit.
 Like the address viewer, the address must be in the same range (0x03810000 - 0x01ff8000)
 ## Credits
-This project wasn't possible without the help of
-[Ed-1T](https://github.com/Ed-1T) for general help and for the original NSMB Console code,
-[TheGameratorT](https://github.com/TheGameratorT) for general help and for fixing crappy multiplayer bugs,
-[Overblade](https://github.com/Overblade) for helping me cleaning the code and for general help as well.
+This project wasn't possible without the help of:
+
+[Ed-1T](https://github.com/Ed-1T) for general help and for the original NSMB Console code;
+
+[TheGameratorT](https://github.com/TheGameratorT) for general help and for fixing crappy multiplayer bugs;
+
+[Overblade](https://github.com/Overblade) for helping me cleaning the code and for general help as well;
