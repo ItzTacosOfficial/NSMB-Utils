@@ -1,5 +1,5 @@
 # NSMB Utils
-NSMB Utils it's an ASM hack for NSMB that includes a Cheat Menu, an Address Viewer and a Ram Viewer.
+NSMB Utils is an ASM hack for NSMB that includes a Cheat Menu, an Address Viewer and a Ram Viewer.
 For now this menu can be only used in the level scene.
 ## How to open it
 To open the menu just press [start] while in a level to open the pause menu, and then press [select] to initialize the NSMB Utils's menu.
